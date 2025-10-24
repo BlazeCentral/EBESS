@@ -1,0 +1,116 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 Timeline (Minimized)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .timeline-container{position:relative;padding-top:2rem;padding-bottom:5rem;margin-top:2rem;min-height:300px;}
+        .timeline-axis{height:2px;background-color:#3b82f6;width:calc(100% - 4rem);margin:0 2rem;position:absolute;bottom:4rem;z-index:10;}
+        .month-marker{position:absolute;transform:translate(-50%,0);z-index:20;color:#1e40af;font-weight:700;font-size:.875rem;text-align:center;}
+        .month-marker::before{content:'';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);width:2px;height:10px;background-color:#3b82f6;}
+        .event-marker{position:absolute;left:0;z-index:30;transition:transform .3s,box-shadow .3s;cursor:pointer;width:90px;text-align:center;}
+        .event-marker-bubble{display:flex;align-items:center;justify-content:center;height:3.5rem;font-size:.7rem;line-height:1.1;font-weight:600;color:white;padding:.25rem .5rem;border-radius:.5rem;box-shadow:0 2px 4px rgba(0,0,0,.1);}
+        .event-marker:hover{transform:scale(1.05);box-shadow:0 5px 15px rgba(0,0,0,.2);}
+        .event-connector{position:absolute;width:2px;height:6px;background-color:#3b82f6;left:50%;transform:translateX(-50%);z-index:20;}
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 md:p-8 font-[Inter]">
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-2xl p-6">
+        <h1 class="text-3xl font-extrabold text-blue-700 mb-6 text-center">2026 Event Timeline (1D View)</h1>
+        <div id="timeline-container" class="timeline-container relative">
+            <div id="main-axis-line" class="timeline-axis"></div>
+            <div id="month-markers-area" class="absolute w-full h-full top-0 left-0"></div>
+            <div id="event-markers-area" class="absolute w-full h-full top-0 left-0"></div>
+        </div>
+        <div id="tooltip" class="absolute z-50 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg pointer-events-none opacity-0 transition-opacity duration-300"></div>
+    </div>
+    <script>
+(function() {
+    const eventsData=[
+        {name:'Market Day',start:'2026-02-01',color:'bg-red-500'},
+        {name:'EUS S1 Careers Fair',start:'2026-03-01',color:'bg-blue-500'},
+        {name:'Careers and Beers',start:'2026-03-01',color:'bg-indigo-500'},
+        {name:'Mech and Elec in Mining',start:'2026-04-01',color:'bg-green-500'},
+        {name:'EBESS Ball',start:'2026-06-01',color:'bg-purple-500'},
+        {name:'EUS S2 Careers Fair',start:'2026-08-01',color:'bg-blue-500'},
+        {name:'EBESS Pubcrawl',start:'2026-08-01',color:'bg-yellow-500'},
+        {name:'Mechatronics Networking',start:'2026-08-01',color:'bg-orange-500'},
+        {name:'High Frequency Networking',start:'2026-09-01',color:'bg-pink-500'},
+        {name:'Monsoon',start:'2026-09-01',color:'bg-cyan-500'},
+        {name:'Graduation Dinner',start:'2026-11-01',color:'bg-gray-500'}
+    ];
+    const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov'];
+    const container=document.getElementById('timeline-container'),monthArea=document.getElementById('month-markers-area'),eventArea=document.getElementById('event-markers-area'),axisLine=document.getElementById('main-axis-line'),tooltip=document.getElementById('tooltip');
+    
+    // Key Constants (Renamed to avoid single-letter conflicts)
+    const EV_HEIGHT=56,EV_GAP=8,AX_BOTTOM=64,M_OFFSET=30,M_WIDTH=90;
+    
+    const START_DATE=new Date('2026-01-01'),END_DATE=new Date('2026-12-01'),DURATION_MS=END_DATE.getTime()-START_DATE.getTime();
+    
+    function formatText(t){
+        const w=t.split(' ');
+        if(w.length<=2)return t;
+        const mid=Math.ceil(w.length/2);
+        return `${w.slice(0,mid).join(' ')}<br>${w.slice(mid).join(' ')}`;
+    }
+    function calculatePos(dStr){
+        const d=new Date(dStr);
+        const passed=d.getTime()-START_DATE.getTime();
+        return Math.min((passed/DURATION_MS)*100,99);
+    }
+    function assignStacks(events){
+        const byDay={},sorted=[...events].sort((a,b)=>new Date(a.start)-new Date(b.start));
+        let positioned=sorted.map(e=>({...e,pos:calculatePos(e.start),dayKey:e.start}));
+        positioned.forEach(e => {
+            const dayEvents=byDay[e.dayKey]||[];
+            e.stackLevel=dayEvents.length;
+            byDay[e.dayKey]=[...dayEvents,e];
+        });
+        return positioned;
+    }
+
+    function renderChart(){
+        const events=assignStacks(eventsData);
+        let maxLevel=events.reduce((max,e)=>Math.max(max,e.stackLevel),-1);
+        const eventsHeight=(maxLevel+1)*(EV_HEIGHT+EV_GAP);
+        container.style.height=`${eventsHeight+AX_BOTTOM+M_OFFSET+40}px`; 
+        axisLine.style.bottom=`${AX_BOTTOM}px`;
+        monthArea.innerHTML='';eventArea.innerHTML='';
+
+        MONTHS.forEach((m,i)=>{
+            const pos=calculatePos(`2026-${String(i+1).padStart(2,'0')}-01`);
+            const marker=document.createElement('div');
+            marker.className='month-marker flex flex-col items-center justify-center';
+            marker.style.left=`calc(${pos}% - .5rem)`;
+            marker.style.top=`calc(100% - ${AX_BOTTOM-M_OFFSET}px)`;
+            marker.innerHTML=`<div class="text-sm font-bold">${m}</div>`;
+            monthArea.appendChild(marker);
+        });
+
+        events.forEach(e=>{
+            const marker=document.createElement('div');
+            marker.className='event-marker';
+            marker.style.left=`calc(${e.pos}% - ${M_WIDTH/2}px)`;
+            const offset=e.stackLevel*(EV_HEIGHT+EV_GAP);
+            const markerBottom=AX_BOTTOM+offset;
+            marker.style.bottom=`${markerBottom}px`;
+            
+            const bubble=document.createElement('div');
+            bubble.className=`event-marker-bubble ${e.color}`;
+            bubble.innerHTML=formatText(e.name);
+            
+            const connector=document.createElement('div');
+            connector.className='event-connector';
+            connector.style.bottom=`${markerBottom-6}px`;
+            
+            marker.appendChild(connector);
+            marker.appendChild(bubble);
+            marker.addEventListener('mousemove', (m)=>{tooltip.textContent=`${e.name} (Start: ${e.start})`;tooltip.style.left=`${m.clientX+10}px`;tooltip.style.top=`${m.clientY+10}px`;tooltip.style.opacity=1;});
+            marker.addEventListener('mouseleave',()=>{tooltip.style.opacity=0;});
+            eventArea.appendChild(marker);
+        });
+        window.addEventListener('resize',renderChart);
+    }
+    window.onload=renderChart;
+})();
+    </script>
+</body></html>
